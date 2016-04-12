@@ -4603,8 +4603,16 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	if (!poped) {
 	    ADD_INSN(ret, line, dup);
 	}
-	ADD_INSN2(ret, line, setinstancevariable,
-		  ID2SYM(node->nd_vid), INT2FIX(iseq->body->is_size++));
+	{
+	    st_table *tbl = ISEQ_COMPILE_DATA(iseq)->ivar_cache_table;
+	    VALUE id,val;
+	    id = ID2SYM(node->nd_vid);
+	    if(!st_lookup(tbl,id,&val)){
+		val = INT2FIX(iseq->body->is_size++);
+		st_insert(tbl,id,val);
+	    }
+	    ADD_INSN2(ret, line, setinstancevariable,id,val);
+	}
 	break;
       }
       case NODE_CDECL:{
@@ -5414,8 +5422,14 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
       case NODE_IVAR:{
 	debugi("nd_vid", node->nd_vid);
 	if (!poped) {
-	    ADD_INSN2(ret, line, getinstancevariable,
-		      ID2SYM(node->nd_vid), INT2FIX(iseq->body->is_size++));
+	    st_table *tbl = ISEQ_COMPILE_DATA(iseq)->ivar_cache_table;
+	    VALUE id,val;
+	    id = ID2SYM(node->nd_vid);
+	    if(!st_lookup(tbl,id,&val)){
+		val = INT2FIX(iseq->body->is_size++);
+		st_insert(tbl,id,val);
+	    }
+	    ADD_INSN2(ret, line, getinstancevariable,id,val);
 	}
 	break;
       }
@@ -8474,4 +8488,3 @@ iseq_ibf_load_extra_data(VALUE str)
     RB_GC_GUARD(loader_obj);
     return extra_str;
 }
-

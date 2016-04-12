@@ -130,7 +130,20 @@ getinstancevariable
 ()
 (VALUE val)
 {
-    val = vm_getinstancevariable(GET_SELF(), id, ic);
+    if (LIKELY(ic->ic_serial == RCLASS_SERIAL(RBASIC(GET_SELF())->klass))) {
+	long index = ic->ic_value.index;
+	val = Qundef;
+	if (index < ROBJECT_NUMIV(GET_SELF())) {
+	    val = ROBJECT_IVPTR(GET_SELF())[index];
+	}
+	if (UNLIKELY(val == Qundef)) {
+	    if (RTEST(ruby_verbose))
+		rb_warning("instance variable %"PRIsVALUE" not initialized", QUOTE_ID(id));
+	    val = Qnil;
+	}
+    }else{
+	val = vm_getinstancevariable(GET_SELF(), id, ic);
+    }
 }
 
 /**
@@ -145,7 +158,15 @@ setinstancevariable
 (VALUE val)
 ()
 {
-    vm_setinstancevariable(GET_SELF(), id, val, ic);
+    if (LIKELY(
+	    RB_TYPE_P(GET_SELF(),T_OBJECT) &&
+	    ic->ic_serial == RCLASS_SERIAL(RBASIC(GET_SELF())->klass) &&
+	    (long)ic->ic_value.index < ROBJECT_NUMIV(GET_SELF()))) {
+	rb_check_frozen(GET_SELF());
+	RB_OBJ_WRITE(GET_SELF(),&ROBJECT_IVPTR(GET_SELF())[(long)ic->ic_value.index],val);
+    }else{
+	vm_setinstancevariable(GET_SELF(), id, val, ic);
+    }
 }
 
 /**
@@ -2190,4 +2211,3 @@ answer
 {
     ret = INT2FIX(42);
 }
-
